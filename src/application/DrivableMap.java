@@ -11,13 +11,13 @@ public class DrivableMap {
 
     public DrivableMap(String imagePath) {
         // 1. Load the image from the source folder
-        this.mapImage = new Image(getClass().getResourceAsStream(imagePath));
+        this.mapImage = new Image(getClass().getResourceAsStream("Game_Map.png"));
         // 2. Get the tool that lets us inspect pixels
         this.pixelReader = mapImage.getPixelReader();
     }
 
     /**
-     * Checks if the given position (x,y) is on a grey pixel (drivable).
+     * Checks if the given position (x,y) is on a road pixel.
      */
     public boolean isDrivable(double x, double y) {
         // Boundary checks to prevent crashes
@@ -28,10 +28,8 @@ public class DrivableMap {
         // Get the color of the exact pixel
         Color color = pixelReader.getColor((int) x, (int) y);
         
-        // We look for a saturation close to zero (grey) and
-        // brightness near 0.6 (this specific grey). White has brightness 1.0.
-        // This is safer than checking strict RGB values.
-        return color.getSaturation() < 0.1 && color.getBrightness() > 0.4 && color.getBrightness() < 0.8;
+        // Road detection: Low saturation (grey/white) and moderate-to-high brightness
+        return color.getSaturation() < 0.15 && color.getBrightness() > 0.35;
     }
 
     public Image getImage() {

@@ -1,50 +1,43 @@
 package application;
 
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.paint.Color;
+import javafx.scene.image.Image;
 import java.util.Random;
 
 public class Food {
-    private double x, y;
-    private final double SIZE = 8.0; // Slightly smaller than the player
+    private double bx, by; // Visual/Building coordinates
+    private double rx, ry; // Road/Collision coordinates
+    private final double SIZE = 64.0; // Scaled up 2x
+    private final double COLLISION_RANGE = 40.0; // Tight range strictly on the road!
     private boolean active = true;
+    private boolean isPickup; 
+    
+    private static Image pickupImage;
+    private static Image deliveryImage;
 
-    public Food(DrivableMap map, int width, int height) {
-        spawnRandomly(map, width, height);
-    }
-
-    private void spawnRandomly(DrivableMap map, int width, int height) {
-        Random rand = new Random();
-        boolean validSpot = false;
-
-        // Try up to 100 times to find a grey pixel
-        for (int i = 0; i < 100; i++) {
-            double testX = rand.nextDouble() * (width - SIZE);
-            double testY = rand.nextDouble() * (height - SIZE);
-
-            if (map.isDrivable(testX + SIZE / 2, testY + SIZE / 2)) {
-                this.x = testX;
-                this.y = testY;
-                validSpot = true;
-                break;
-            }
-        }
+    public Food(double bx, double by, double rx, double ry, boolean isPickup) {
+        this.bx = bx;
+        this.by = by;
+        this.rx = rx;
+        this.ry = ry;
+        this.isPickup = isPickup;
         
-        // If no spot found in 100 tries, default to a safe middle spot 
-        // (Adjust this to a known grey coordinate on your map)
-        if (!validSpot) {
-            this.x = 160; 
-            this.y = 100;
+        if (pickupImage == null) {
+            pickupImage = new Image(getClass().getResourceAsStream("Delivery_Indicator.png"));
+            deliveryImage = new Image(getClass().getResourceAsStream("Food_Indicator.png"));
         }
     }
 
     public boolean checkCollision(double playerX, double playerY, double playerSize) {
-        // Simple AABB (Axis-Aligned Bounding Box) collision
-        return active && 
-               playerX < x + SIZE &&
-               playerX + playerSize > x &&
-               playerY < y + SIZE &&
-               playerY + playerSize > y;
+        // Collision is strictly based on the ROAD coordinates (rx, ry) directly below the building.
+        // With a tight COLLISION_RANGE (40), the player must be specifically on the road below the indicator.
+        double centerX = rx;
+        double centerY = ry;
+        double pCenterX = playerX + playerSize / 2;
+        double pCenterY = playerY + playerSize / 2;
+        
+        double distance = Math.sqrt(Math.pow(centerX - pCenterX, 2) + Math.pow(centerY - pCenterY, 2));
+        return active && distance < COLLISION_RANGE;
     }
 
     public void collect() {
@@ -55,11 +48,16 @@ public class Food {
         return active;
     }
     
-    //PLACEHOLDER AI GENERATED FOR TESTING
+    public boolean isPickup() {
+        return isPickup;
+    }
+
     public void draw(GraphicsContext gc) {
         if (active) {
-            gc.setFill(Color.LIMEGREEN);
-            gc.fillOval(x, y, SIZE, SIZE); // Food looks like a little green circle
+            Image img = isPickup ? pickupImage : deliveryImage;
+            // Draw on the BUILDING coordinates (bx, by)
+            // Offset by half size so it centers on the building
+            gc.drawImage(img, bx - SIZE/2, by - SIZE/2, SIZE, SIZE);
         }
     }
 }

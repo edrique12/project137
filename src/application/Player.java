@@ -8,10 +8,10 @@ class Player {
     
     //AI GENERATED DIMENSIONS FOR PLACEHOLDERS
     // 1. Reduced Size (10 to 15 is good for a 320x180 map)
-    private final double SIZE = 12.0; 
+    private final double SIZE = 20.0; 
     
     // 2. Reduced Speed (at 320px width, 6.0 is way too fast)
-    private final double SPEED = 2.0; 
+    private final double SPEED = 4.0; 
 
     public Player(double x, double y) {
         this.x = x;

@@ -16,9 +16,8 @@ import javafx.stage.Stage;
 
 public class Main extends Application {
 
-    // Dimensions based on your map (320x180)
-    private final int WIDTH = 320; 
-    private final int HEIGHT = 180; 
+    private double width; 
+    private double height; 
 
     // Game Logic Variables
     private long lastUpdateTime = 0;
@@ -27,46 +26,50 @@ public class Main extends Application {
     
     private boolean w, a, s, d;
     private Label hudLabel;
+    private Label missionLabel;
     
     // Game Objects
     private Player player;
     private DrivableMap gameMap;
-    private Food currentFood;
+    private Food currentGoal;
+    private boolean isWaitingForPickup = true;
 
     @Override
     public void start(Stage primaryStage) {
         // 1. Initialize Game World
-        gameMap = new DrivableMap("map.png");
-        player = new Player(160, 100); // Centered spawn
-        currentFood = new Food(gameMap, WIDTH, HEIGHT);
+        gameMap = new DrivableMap("Game_Map.png");
+        width = gameMap.getImage().getWidth();
+        height = gameMap.getImage().getHeight();
+        
+        player = new Player(width / 2, height / 2); // Center spawn
+        spawnNewGoal();
 
         // 2. Setup the HUD (Timer & Score)
         hudLabel = new Label("Score: 0 | 02:00");
-        hudLabel.setFont(new Font("Monospaced", 14));
-        hudLabel.setStyle(
-            "-fx-background-color: rgba(0, 0, 0, 0.7);" +
-            "-fx-text-fill: white;" +
-            "-fx-padding: 5 10 5 10;" +
-            "-fx-background-radius: 8;" +
-            "-fx-border-color: #555555;" +
-            "-fx-border-radius: 8;"
-        );
+        hudLabel.setFont(new Font("Monospaced", 18));
+        hudLabel.setStyle("-fx-background-color: rgba(0, 0, 0, 0.7); -fx-text-fill: white; -fx-padding: 10; -fx-background-radius: 8;");
 
-        // 3. Setup Canvas and Border
-        Canvas canvas = new Canvas(WIDTH, HEIGHT);
+        missionLabel = new Label("Objective: Pick up order at a restaurant!");
+        missionLabel.setFont(new Font("Arial", 16));
+        missionLabel.setStyle("-fx-text-fill: #FFD700; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 5, 0, 0, 0);");
+
+        // 3. Setup Canvas
+        Canvas canvas = new Canvas(width, height);
         GraphicsContext gc = canvas.getGraphicsContext2D();
-        
-        StackPane canvasBorder = new StackPane(canvas);
-        canvasBorder.setStyle("-fx-border-color: #222222; -fx-border-width: 4; -fx-border-style: solid;");
 
         // 4. Layout
         StackPane root = new StackPane();
-        root.getChildren().addAll(canvasBorder, hudLabel);
-        root.setAlignment(hudLabel, Pos.TOP_CENTER);
-        root.setMargin(hudLabel, new Insets(10, 0, 0, 0));
-        root.setStyle("-fx-background-color: #444444;"); // Dark background outside map
+        root.getChildren().addAll(canvas, hudLabel, missionLabel);
+        
+        root.setAlignment(hudLabel, Pos.TOP_RIGHT);
+        root.setMargin(hudLabel, new Insets(10));
+        
+        root.setAlignment(missionLabel, Pos.TOP_LEFT);
+        root.setMargin(missionLabel, new Insets(10));
+        
+        root.setStyle("-fx-background-color: #222222;");
 
-        Scene scene = new Scene(root, WIDTH + 40, HEIGHT + 100);
+        Scene scene = new Scene(root, width, height);
 
         // 5. Inputs
         scene.setOnKeyPressed(e -> handleKeys(e.getCode(), true));
@@ -85,10 +88,20 @@ public class Main extends Application {
             }
         }.start();
 
-        primaryStage.setTitle("Motorcycle Food Hunt");
+        primaryStage.setTitle("UPLB Food Delivery Hero");
         primaryStage.setScene(scene);
         primaryStage.setResizable(false);
         primaryStage.show();
+    }
+
+    private void spawnNewGoal() {
+        if (isWaitingForPickup) {
+            Location loc = Location.getRandomEstablishment();
+            currentGoal = new Food(loc.bx, loc.by, loc.rx, loc.ry, true);
+        } else {
+            Location loc = Location.getRandomLandmark();
+            currentGoal = new Food(loc.bx, loc.by, loc.rx, loc.ry, false);
+        }
     }
 
     private void handleKeys(KeyCode code, boolean isPressed) {
@@ -102,33 +115,34 @@ public class Main extends Application {
     }
 
     private void update(double delta) {
-        // Timer countdown
         if (timerSeconds > 0) {
             timerSeconds -= delta;
         } else {
             timerSeconds = 0;
-            hudLabel.setTextFill(Color.RED);
         }
 
-        // Move Player
         player.update(w, a, s, d, gameMap);
 
-        // Check for Food Collection
-        if (currentFood.checkCollision(player.getX(), player.getY(), player.getSize())) {
-            score += 10;
-            currentFood = new Food(gameMap, WIDTH, HEIGHT);
+        if (currentGoal != null && currentGoal.checkCollision(player.getX(), player.getY(), player.getSize())) {
+            if (isWaitingForPickup) {
+                isWaitingForPickup = false;
+                missionLabel.setText("Objective: Deliver to a landmark!");
+                missionLabel.setStyle("-fx-text-fill: #00FF00;");
+            } else {
+                score += 100;
+                isWaitingForPickup = true;
+                missionLabel.setText("Objective: Pick up next order!");
+                missionLabel.setStyle("-fx-text-fill: #FFD700;");
+            }
+            spawnNewGoal();
         }
     }
 
     private void render(GraphicsContext gc) {
-        // Draw map background
-        gc.drawImage(gameMap.getImage(), 0, 0);
-
-        // Draw Game Objects
-        currentFood.draw(gc);
+        gc.drawImage(gameMap.getImage(), 0, 0, width, height);
+        currentGoal.draw(gc);
         player.draw(gc);
 
-        // Update HUD Text
         int minutes = (int) timerSeconds / 60;
         int seconds = (int) timerSeconds % 60;
         hudLabel.setText(String.format("Score: %d | %02d:%02d", score, minutes, seconds));
