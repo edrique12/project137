@@ -13,6 +13,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
+import java.util.ArrayList;
 
 public class Main extends Application {
 
@@ -23,6 +24,10 @@ public class Main extends Application {
     private long lastUpdateTime = 0;
     private double timerSeconds = 120.0;
     private int score = 0;
+    private int health = 100;
+
+    // Random traffic cars
+    private ArrayList<Traffic_Car> trafficCars = new ArrayList<>();
     
     private boolean w, a, s, d;
     private Label hudLabel;
@@ -115,37 +120,102 @@ public class Main extends Application {
     }
 
     private void update(double delta) {
+        // Timer
         if (timerSeconds > 0) {
             timerSeconds -= delta;
         } else {
             timerSeconds = 0;
         }
 
+        // Player movement
         player.update(w, a, s, d, gameMap);
 
-        if (currentGoal != null && currentGoal.checkCollision(player.getX(), player.getY(), player.getSize())) {
-            if (isWaitingForPickup) {
-                isWaitingForPickup = false;
-                missionLabel.setText("Objective: Deliver to a landmark!");
-                missionLabel.setStyle("-fx-text-fill: #00FF00;");
-            } else {
-                score += 100;
-                isWaitingForPickup = true;
-                missionLabel.setText("Objective: Pick up next order!");
-                missionLabel.setStyle("-fx-text-fill: #FFD700;");
+        // Spawn random traffic cars
+        if (Math.random() < 0.005) {
+            trafficCars.add(
+                    new Traffic_Car(width, height, gameMap)
+            );
+        }
+
+        // Update traffic + collision
+        for (int i = trafficCars.size() - 1; i >= 0; i--) {
+
+            Traffic_Car car = trafficCars.get(i);
+
+            car.update(delta, gameMap);  // pass delta now
+
+            // Damage player
+            if (car.collides(player)) {
+                health -= 1;
+                car.onPlayerCollision();  // trigger angry emoji + slowdown
+                if (health < 0) health = 0;
             }
+
+            // Remove off-screen cars
+            if (car.isOffScreen(width, height)) {
+                trafficCars.remove(i);
+            }
+        }
+
+        // Delivery system
+        if (currentGoal != null &&
+                currentGoal.checkCollision(
+                        player.getX(),
+                        player.getY(),
+                        player.getSize()
+                )) {
+
+            if (isWaitingForPickup) {
+
+                isWaitingForPickup = false;
+
+                missionLabel.setText(
+                        "Objective: Deliver to a landmark!"
+                );
+
+                missionLabel.setStyle(
+                        "-fx-text-fill: #00FF00;"
+                );
+
+            } else {
+
+                score += 100;
+
+                isWaitingForPickup = true;
+
+                missionLabel.setText(
+                        "Objective: Pick up next order!"
+                );
+
+                missionLabel.setStyle(
+                        "-fx-text-fill: #FFD700;"
+                );
+            }
+
             spawnNewGoal();
         }
     }
 
     private void render(GraphicsContext gc) {
-        gc.drawImage(gameMap.getImage(), 0, 0, width, height);
+        gc.drawImage(gameMap.getImage(), 0, 0, width, height );
+
+        // Goal marker
         currentGoal.draw(gc);
+
+        // Draw random traffic
+        for (Traffic_Car car : trafficCars) {
+            car.draw(gc);
+        }
+
+        // Draw player
         player.draw(gc);
 
         int minutes = (int) timerSeconds / 60;
         int seconds = (int) timerSeconds % 60;
-        hudLabel.setText(String.format("Score: %d | %02d:%02d", score, minutes, seconds));
+
+        hudLabel.setText(
+                String.format("HP: %d | Score: %d | %02d:%02d", health, score, minutes, seconds)
+        );
     }
 
     public static void main(String[] args) {
