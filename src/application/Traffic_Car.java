@@ -94,13 +94,22 @@ class Traffic_Car {
                 }
             }
 
-            // Check a point slightly inside the map in the direction of travel
-            double checkX = x + dx * (SIZE * 2) + SIZE / 2;
-            double checkY = y + dy * (SIZE * 2) + SIZE / 2;
-
-            // Clamp check point to map bounds
-            checkX = Math.max(0, Math.min(mapWidth - 1, checkX));
-            checkY = Math.max(0, Math.min(mapHeight - 1, checkY));
+            // Check a point at the edge of the map where the car enters
+            double checkX = x;
+            double checkY = y;
+            if (dx == 1) { // moving right
+                checkX = 5;
+                checkY = y + SIZE / 2;
+            } else if (dx == -1) { // moving left
+                checkX = mapWidth - 5;
+                checkY = y + SIZE / 2;
+            } else if (dy == 1) { // moving down
+                checkX = x + SIZE / 2;
+                checkY = 5;
+            } else if (dy == -1) { // moving up
+                checkX = x + SIZE / 2;
+                checkY = mapHeight - 5;
+            }
 
             validSpawn = map.isDrivable(checkX, checkY);
         }
@@ -138,10 +147,16 @@ class Traffic_Car {
         double centerX = nextX + SIZE / 2;
         double centerY = nextY + SIZE / 2;
 
-        // Always move — ignore buildings (only stop if truly off-map)
-        if (centerX >= 0 && centerY >= 0) {
+        boolean isInsideMap = centerX >= 0 && centerX < map.getImage().getWidth() &&
+                              centerY >= 0 && centerY < map.getImage().getHeight();
+
+        if (!isInsideMap || map.isDrivable(centerX, centerY)) {
             x = nextX;
             y = nextY;
+        } else {
+            // Hit a non-drivable area (grass/building), despawn immediately
+            x = -1000;
+            y = -1000;
         }
     }
 

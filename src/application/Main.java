@@ -26,8 +26,10 @@ public class Main extends Application {
     private int score = 0;
     private int health = 100;
 
-    // Random traffic cars
-    private ArrayList<Traffic_Car> trafficCars = new ArrayList<>();
+    // Smart Jeep Obstacle
+    private Jeep jeep;
+    private double damageCooldown = 0.0;
+    private static final double DAMAGE_COOLDOWN_DURATION = 1.5;
     
     private boolean w, a, s, d;
     private Label hudLabel;
@@ -38,6 +40,7 @@ public class Main extends Application {
     private DrivableMap gameMap;
     private Food currentGoal;
     private boolean isWaitingForPickup = true;
+    private ArrayList<Item> items = new ArrayList<>();
 
     @Override
     public void start(Stage primaryStage) {
@@ -47,7 +50,12 @@ public class Main extends Application {
         height = gameMap.getImage().getHeight();
         
         player = new Player(width / 2, height / 2); // Center spawn
+        jeep = new Jeep(gameMap);
         spawnNewGoal();
+
+        // Spawn 1 poop and 1 sunflower
+        items.add(new Item(Item.ItemType.POOP, gameMap, width, height));
+        items.add(new Item(Item.ItemType.SUNFLOWER, gameMap, width, height));
 
         // 2. Setup the HUD (Timer & Score)
         hudLabel = new Label("Score: 0 | 02:00");
@@ -128,32 +136,35 @@ public class Main extends Application {
         }
 
         // Player movement
-        player.update(w, a, s, d, gameMap);
+        player.update(delta, w, a, s, d, gameMap, jeep);
 
-        // Spawn random traffic cars
-        if (Math.random() < 0.005) {
-            trafficCars.add(
-                    new Traffic_Car(width, height, gameMap)
-            );
+        // Update items and check collisions
+        for (Item item : items) {
+            if (item.checkCollision(player.getX(), player.getY(), player.getSize())) {
+                if (item.getType() == Item.ItemType.POOP) {
+                    player.applySlow(5.0);
+                } else if (item.getType() == Item.ItemType.SUNFLOWER) {
+                    player.applyBoost(5.0);
+                }
+                item.respawn(gameMap, width, height);
+            }
         }
 
-        // Update traffic + collision
-        for (int i = trafficCars.size() - 1; i >= 0; i--) {
+        // Update damage cooldown timer
+        if (damageCooldown > 0) {
+            damageCooldown -= delta;
+        }
 
-            Traffic_Car car = trafficCars.get(i);
+        // Update smart Jeep + collision
+        if (jeep != null) {
+            jeep.update(delta, player);
 
-            car.update(delta, gameMap);  // pass delta now
-
-            // Damage player
-            if (car.collides(player)) {
-                health -= 1;
-                car.onPlayerCollision();  // trigger angry emoji + slowdown
-                if (health < 0) health = 0;
-            }
-
-            // Remove off-screen cars
-            if (car.isOffScreen(width, height)) {
-                trafficCars.remove(i);
+            if (jeep.collidesWith(player.getX(), player.getY(), player.getSize())) {
+                if (damageCooldown <= 0) {
+                    health -= 10; // Collision damage
+                    if (health < 0) health = 0;
+                    damageCooldown = DAMAGE_COOLDOWN_DURATION;
+                }
             }
         }
 
@@ -202,9 +213,14 @@ public class Main extends Application {
         // Goal marker
         currentGoal.draw(gc);
 
-        // Draw random traffic
-        for (Traffic_Car car : trafficCars) {
-            car.draw(gc);
+        // Draw smart Jeep
+        if (jeep != null) {
+            jeep.draw(gc);
+        }
+
+        // Draw items
+        for (Item item : items) {
+            item.draw(gc);
         }
 
         // Draw player

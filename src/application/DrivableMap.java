@@ -25,9 +25,15 @@ public class DrivableMap {
             return false;
         }
 
+        // Exception to allow passing in front of the Kwek Kwek Tower base
+        // which extends into the road and has a dark outline that blocks movement.
+        if (x >= 590 && x <= 690 && y >= 530 && y <= 590) {
+            return true;
+        }
+
         // Get the color of the exact pixel
         Color color = pixelReader.getColor((int) x, (int) y);
-        
+
         // Road detection: Low saturation (grey/white) and moderate-to-high brightness
         return color.getSaturation() < 0.15 && color.getBrightness() > 0.35;
     }

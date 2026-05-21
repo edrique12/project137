@@ -1,6 +1,6 @@
 package application;
 
-import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.canvas  .GraphicsContext;
 import javafx.scene.image.Image;
 
 class Player {
@@ -20,6 +20,9 @@ class Player {
     private int frameCol = 1; // DOWN
     private int frameRow = 0;
 
+    private double slowTimer = 0.0;
+    private double boostTimer = 0.0;
+
     public Player(double x, double y) {
         this.x = x;
         this.y = y;
@@ -27,39 +30,64 @@ class Player {
         spriteSheet = new Image(getClass().getResourceAsStream("cars/player/player1_spreadsheet.png"));
     }
 
-    public void update(boolean w, boolean a, boolean s, boolean d, DrivableMap map) {
-        double nextX = x;
-        double nextY = y;
+    public void applySlow(double duration) {
+        this.slowTimer = duration;
+    }
+
+    public void applyBoost(double duration) {
+        this.boostTimer = duration;
+    }
+
+    public void update(double delta, boolean w, boolean a, boolean s, boolean d, DrivableMap map, Jeep jeep) {
+        // Tick down timers
+        if (slowTimer > 0) {
+            slowTimer -= delta;
+        }
+        if (boostTimer > 0) {
+            boostTimer -= delta;
+        }
+
+        // Calculate dynamic speed
+        double currentSpeed = SPEED;
+        if (slowTimer > 0) {
+            currentSpeed *= 0.5;
+        }
+        if (boostTimer > 0) {
+            currentSpeed *= 2.0;
+        }
+
+        double moveX = 0;
+        double moveY = 0;
 
         // Movement + direction
         // Diagonals
         if (w && d) {
-            nextY -= SPEED;
-            nextX += SPEED;
+            moveY = -currentSpeed;
+            moveX = currentSpeed;
 
             frameCol = 0;
             frameRow = 1; // UP_RIGHT
         }
 
         else if (w && a) {
-            nextY -= SPEED;
-            nextX -= SPEED;
+            moveY = -currentSpeed;
+            moveX = -currentSpeed;
 
             frameCol = 1;
             frameRow = 1; // UP_LEFT
         }
 
         else if (s && d) {
-            nextY += SPEED;
-            nextX += SPEED;
+            moveY = currentSpeed;
+            moveX = currentSpeed;
 
             frameCol = 2;
             frameRow = 1; // DOWN_RIGHT
         }
 
         else if (s && a) {
-            nextY += SPEED;
-            nextX -= SPEED;
+            moveY = currentSpeed;
+            moveX = -currentSpeed;
 
             frameCol = 3;
             frameRow = 1; // DOWN_LEFT
@@ -67,40 +95,70 @@ class Player {
 
         // Straight directions
         else if (w) {
-            nextY -= SPEED;
+            moveY = -currentSpeed;
 
             frameCol = 0;
             frameRow = 0; // UP
         }
 
         else if (s) {
-            nextY += SPEED;
+            moveY = currentSpeed;
 
             frameCol = 1;
             frameRow = 0; // DOWN
         }
 
         else if (d) {
-            nextX += SPEED;
+            moveX = currentSpeed;
 
             frameCol = 2;
             frameRow = 0; // RIGHT
         }
 
         else if (a) {
-            nextX -= SPEED;
+            moveX = -currentSpeed;
 
             frameCol = 3;
             frameRow = 0; // LEFT
         }
 
-        // Collision Check: Check the center of the player
-        double centerX = nextX + (SIZE / 2);
-        double centerY = nextY + (SIZE / 2);
+        // Sliding collision response: test X and Y axes independently
+        // 1. Test X axis movement
+        if (moveX != 0) {
+            double testNextX = x + moveX;
+            double testCenterX = testNextX + (SIZE / 2);
+            double testCenterY = y + (SIZE / 2);
 
-        if (map.isDrivable(centerX, centerY)) {
-            this.x = nextX;
-            this.y = nextY;
+            boolean roadDrivable = map.isDrivable(testCenterX, testCenterY);
+            boolean allowedByJeep = true;
+            if (jeep != null) {
+                if (jeep.collidesWith(testNextX, y, SIZE)) {
+                    allowedByJeep = jeep.isMovingAway(this.x, this.y, testNextX, y, SIZE);
+                }
+            }
+
+            if (roadDrivable && allowedByJeep) {
+                this.x = testNextX;
+            }
+        }
+
+        // 2. Test Y axis movement
+        if (moveY != 0) {
+            double testNextY = y + moveY;
+            double testCenterX = x + (SIZE / 2);
+            double testCenterY = testNextY + (SIZE / 2);
+
+            boolean roadDrivable = map.isDrivable(testCenterX, testCenterY);
+            boolean allowedByJeep = true;
+            if (jeep != null) {
+                if (jeep.collidesWith(x, testNextY, SIZE)) {
+                    allowedByJeep = jeep.isMovingAway(this.x, this.y, x, testNextY, SIZE);
+                }
+            }
+
+            if (roadDrivable && allowedByJeep) {
+                this.y = testNextY;
+            }
         }
     }
 
